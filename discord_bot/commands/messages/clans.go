@@ -2,10 +2,10 @@ package messages
 
 import (
 	"fmt"
-	"math/rand"
+	"log/slog"
+	"math"
 	"sort"
 	"strconv"
-	"time"
 
 	"github.com/aaantiii/goclash"
 	"github.com/alexeyco/simpletable"
@@ -47,168 +47,122 @@ func PlayerLeaderboardTable(playerStats types.PlayerStatistics) string {
 }
 
 type cwMember struct {
+	tag       string
 	name      string
 	discordID string
 	warPos    int
 }
 
-func getDonatorRanges(size int) [][][]int {
-	ranges := map[int][][][]int{
-		5:  {{{1, 3}, {4, 5}}, {{4, 5}, {1, 3}}}, // {{donator1}, {donator2}}
-		10: {{{1, 5}, {6, 10}}, {{6, 10}, {1, 5}}},
-		15: {{{1, 7}, {8, 15}}, {{8, 15}, {1, 7}}},
-		20: {{{1, 10}, {11, 20}}, {{11, 20}, {1, 10}}},
-		25: {{{1, 12}, {13, 25}}, {{13, 25}, {1, 12}}},
-		30: {{{1, 10}, {11, 20}}, {{11, 20}, {21, 30}}, {{21, 30}, {1, 10}}},
-		35: {{{1, 11}, {12, 35}}, {{12, 23}, {24, 35}}, {{24, 35}, {1, 11}}},
-		40: {{{1, 10}, {11, 20}}, {{11, 20}, {1, 10}}, {{21, 30}, {31, 40}}, {{31, 40}, {21, 30}}},
-		45: {{{1, 11}, {12, 22}}, {{12, 22}, {1, 11}}, {{23, 33}, {34, 45}}, {{34, 45}, {23, 33}}},
-		50: {{{1, 10}, {11, 20}}, {{11, 20}, {1, 10}}, {{21, 30}, {31, 40}}, {{31, 40}, {41, 50}}, {{41, 50}, {21, 30}}},
-	}
-	return ranges[size]
-}
-func getRandom(min, max int) int {
-	return rand.Intn(max-min+1) + min
+type cwDonator struct {
+	cwMember
+	donationRange cwDonatorRange
 }
 
-func SendCWDonatorPing(s *discordgo.Session, i *discordgo.InteractionCreate, members []*models.ClanMember, ClanWarMembers []goclash.ClanWarMember, clanMemberByTag map[string]goclash.Player) {
-	memberByTag := make(map[string]models.ClanMember, len(members))
+type cwDonatorRange struct {
+	start int
+	end   int
+}
+
+func getDonatorRanges(cwSize int) []cwDonatorRange {
+	numRanges := int(math.Ceil(float64(cwSize) / 10))
+	rangeSize := int(math.Ceil(float64(cwSize) / float64(numRanges)))
+
+	donatorRanges := make([]cwDonatorRange, numRanges)
+	for i := 0; i < numRanges; i++ {
+		start := i*rangeSize + 1
+		end := start + rangeSize - 1
+		if end > cwSize {
+			end = cwSize
+		}
+		donatorRanges[i] = cwDonatorRange{start: start, end: end}
+	}
+
+	return donatorRanges
+}
+
+func CWDonatorPing(members []*models.ClanMember, clanWarMembers []goclash.ClanWarMember, clanMemberByTag map[string]*goclash.Player) string {
+	memberByTag := make(map[string]*models.ClanMember, len(members))
 	for _, member := range members {
 		if member.Player == nil {
 			continue
 		}
-		memberByTag[member.PlayerTag] = *member
+		memberByTag[member.PlayerTag] = member
 	}
 
-	var cwMembers []cwMember
-	for _, clanWarMember := range ClanWarMembers {
-		clanMember, clanMemberExists := clanMemberByTag[clanWarMember.Tag]
-		if !clanMemberExists {
-			println("Error: clanMember not found for tag", clanWarMember.Tag)
+	var possibleDonators []cwMember
+	for _, clanWarMember := range clanWarMembers {
+		clanMember, found := clanMemberByTag[clanWarMember.Tag]
+		if !found {
+			slog.Error("clanMember not found", slog.String("tag", clanWarMember.Tag))
 			continue
 		}
 
-		member, memberExists := memberByTag[clanMember.Tag]
-
-		if member.Player == nil {
-			println("Error: member.Player is nil for tag", clanMember.Tag)
+		if clanMember.WarPreference != "in" {
 			continue
 		}
 
-		if clanMember.WarPreference == "in" {
-			if memberExists {
-				cwMembers = append(cwMembers, cwMember{
-					name:      clanWarMember.Name,
-					discordID: member.Player.DiscordID,
-					warPos:    clanWarMember.MapPosition,
-				})
-			} else {
-				cwMembers = append(cwMembers, cwMember{
-					name:      clanWarMember.Name,
-					discordID: "",
-					warPos:    clanWarMember.MapPosition,
-				})
-			}
-		}
-	}
-
-	time.Sleep(5 * time.Second)
-
-	cwSize := len(ClanWarMembers)
-	ranges := getDonatorRanges(cwSize)
-
-	type Donator struct {
-		int      int
-		tag      string
-		name     string
-		rangeStr string
-	}
-
-	donators := make(map[string]Donator)
-
-	rand.Seed(time.Now().UnixNano())
-
-	keys := map[int]string{
-		0: "first",
-		1: "second",
-		2: "third",
-		3: "fourth",
-		4: "fifth",
-	}
-
-	for {
-		valid := true
-
-		for i, r := range ranges {
-			donation_range := r[0]
-			donator_random_range := r[1]
-			key := keys[i]
-			donators[key] = Donator{
-				int:      getRandom(donator_random_range[0], donator_random_range[1]),
-				tag:      "",
-				name:     "",
-				rangeStr: fmt.Sprintf("%d-%d", donation_range[0], donation_range[1]),
-			}
+		discordID := ""
+		if member, memberExists := memberByTag[clanMember.Tag]; memberExists && member.Player != nil {
+			discordID = member.Player.DiscordID
 		}
 
-		for _, member := range cwMembers {
-			for key, donator := range donators {
-				if donator.int == member.warPos {
-					donators[key] = Donator{
-						int:      donator.int,
-						tag:      member.discordID,
-						name:     member.name,
-						rangeStr: donator.rangeStr,
-					}
-				}
-			}
-		}
-
-		donatorMap := make(map[string]bool)
-		for _, donator := range donators {
-			if donator.tag == "" {
-				valid = false
-				break
-			}
-			if _, exists := donatorMap[donator.tag]; exists {
-				valid = false
-				break
-			}
-		}
-
-		if valid {
-			break
-		}
+		possibleDonators = append(possibleDonators, cwMember{
+			tag:       clanWarMember.Tag,
+			name:      clanWarMember.Name,
+			discordID: discordID,
+			warPos:    clanWarMember.MapPosition,
+		})
 	}
 
-	var content string
-	keysList := []string{"first", "second", "third", "fourth", "fifth"}
-	for _, key := range keysList {
-		donator := donators[key]
-		if donator.tag != "" {
-			content += fmt.Sprintf("%s: %s (<@%s>) (%d)\n", donator.rangeStr, donator.name, donator.tag, donator.int)
-		}
+	if len(possibleDonators) == 0 {
+		return "Es sind keine Mitglieder im Krieg."
 	}
 
-	if content == "" {
-		content = "Es sind keine Mitglieder im Krieg."
-	}
-
-	editEmbed := NewEmbed("CW Spender", "Folgende Mitglieder wurden zufällig als Spender ausgewählt:", ColorAqua)
-
-	_, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-		Embeds: &[]*discordgo.MessageEmbed{editEmbed},
+	sort.SliceStable(possibleDonators, func(i, j int) bool {
+		return possibleDonators[i].warPos < possibleDonators[j].warPos
 	})
-	if err != nil {
-		println("Error editing message:", err)
+
+	cwSize := len(clanWarMembers)
+	ranges := getDonatorRanges(cwSize)
+	donators := make([]cwDonator, len(ranges))
+
+	uniqueRand := util.NewUniqueRand()
+	for index := range donators {
+		donationRange := ranges[(index+1)%len(ranges)]
+
+		randomIndexEnd := donationRange.end - 1
+		if randomIndexEnd > len(possibleDonators)-1 {
+			randomIndexEnd = len(possibleDonators) - 1
+		}
+
+		// Muss zur Sicherheit gemacht werden, falls extrem viele auf Rot gestellt sind...
+		randomIndexStart := donationRange.start - 1
+		if randomIndexStart > randomIndexEnd {
+			randomIndexStart = randomIndexEnd
+		}
+
+		randomDonator := possibleDonators[uniqueRand.Intn(randomIndexStart, randomIndexEnd)]
+		donators[index] = cwDonator{
+			cwMember:      randomDonator,
+			donationRange: ranges[index],
+		}
 	}
 
-	// send new message to the same channel with the ping message
-	channelID := i.ChannelID
-	_, err = s.ChannelMessageSend(channelID, content)
-	if err != nil {
-		println("Error sending message:", err)
+	// sort by donation range
+	sort.Slice(donators, func(i, j int) bool {
+		return donators[i].donationRange.start < donators[j].donationRange.start
+	})
+
+	content := ""
+	for _, donator := range donators {
+		content += fmt.Sprintf("%d-%d: %s", donator.donationRange.start, donator.donationRange.end, donator.name)
+		if donator.discordID != "" {
+			content += fmt.Sprintf(" (<@%s>)", donator.discordID)
+		}
+		content += fmt.Sprintf(" (Nr. %d)\n", donator.warPos)
 	}
+
+	return content
 }
 
 type raidPingMember struct {
