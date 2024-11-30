@@ -6,7 +6,7 @@ import (
 )
 
 type User struct {
-	DiscordID string `gorm:"size:18;primaryKey;not null"`
+	DiscordID string `gorm:"size:19;primaryKey;not null"`
 	Name      string `gorm:"size:32;not null"`
 	IsAdmin   bool   `gorm:"default:false;not null"`
 }
