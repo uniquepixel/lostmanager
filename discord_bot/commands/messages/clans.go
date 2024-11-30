@@ -118,18 +118,40 @@ func CWDonatorPing(members []*models.ClanMember, clanWarMembers []goclash.ClanWa
 		return "Es sind keine Mitglieder im Krieg."
 	}
 
+	sort.SliceStable(possibleDonators, func(i, j int) bool {
+		return possibleDonators[i].warPos < possibleDonators[j].warPos
+	})
+
 	cwSize := len(clanWarMembers)
 	ranges := getDonatorRanges(cwSize)
 	donators := make([]cwDonator, len(ranges))
 
 	uniqueRand := util.NewUniqueRand()
 	for index := range donators {
-		randomDonator := possibleDonators[uniqueRand.Intn(0, len(possibleDonators)-1)]
+		donationRange := ranges[(index+1)%len(ranges)]
+
+		randomIndexEnd := donationRange.end - 1
+		if randomIndexEnd > len(possibleDonators)-1 {
+			randomIndexEnd = len(possibleDonators) - 1
+		}
+
+		// Muss zur Sicherheit gemacht werden, falls extrem viele auf Rot gestellt sind...
+		randomIndexStart := donationRange.start - 1
+		if randomIndexStart > randomIndexEnd {
+			randomIndexStart = randomIndexEnd
+		}
+
+		randomDonator := possibleDonators[uniqueRand.Intn(randomIndexStart, randomIndexEnd)]
 		donators[index] = cwDonator{
 			cwMember:      randomDonator,
 			donationRange: ranges[index],
 		}
 	}
+
+	// sort by donation range
+	sort.Slice(donators, func(i, j int) bool {
+		return donators[i].donationRange.start < donators[j].donationRange.start
+	})
 
 	content := ""
 	for _, donator := range donators {
