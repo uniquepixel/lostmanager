@@ -18,4 +18,5 @@ const (
 	AliasOptionName       = "alias"
 	MessageIDOptionName   = "message_id"
 	EmojiOptionName       = "emoji"
+	ChannelOptionName     = "channel"
 )

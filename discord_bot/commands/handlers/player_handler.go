@@ -214,6 +214,13 @@ func (h *PlayerHandler) CheckReactions(s *discordgo.Session, i *discordgo.Intera
 	role, roleErr := util.RoleOptionByName(RoleOptionName, i.GuildID, opts) // role to check reactions for
 	messageID := util.StringOptionByName(MessageIDOptionName, opts)         // message to check reactions for
 	emoji, emojiErr := util.EmojiOptionByName(EmojiOptionName, opts)        // emoji to check reactions for
+	channel, _ := util.ChannelOptionByName(ChannelOptionName, opts)         // channel to check reactions for
+
+	channelID := channel.ID
+
+	if channelID == "" {
+		channelID = i.ChannelID
+	}
 
 	slog.Debug("data from CheckReactions", slog.Any("role", role), slog.String("messageID", messageID), slog.Any("emoji", emoji))
 
@@ -222,7 +229,7 @@ func (h *PlayerHandler) CheckReactions(s *discordgo.Session, i *discordgo.Intera
 		return
 	}
 
-	usersReacted, err := s.MessageReactions(i.ChannelID, messageID, emoji.GlobalID, 100, "", "")
+	usersReacted, err := s.MessageReactions(channelID, messageID, emoji.GlobalID, 100, "", "")
 	if err != nil {
 		slog.Debug("Error while getting reactions for message.", slog.Any("err", err))
 		messages.SendErr(i, "Die Reaktionen auf die Nachricht konnten nicht abgerufen werden. Dies kann daran liegen, dass niemand mit diesem Emoji auf die Nachricht reagiert hat, oder dass die Nachricht in einem anderen Channel geschrieben wurde.")
@@ -255,7 +262,7 @@ func (h *PlayerHandler) CheckReactions(s *discordgo.Session, i *discordgo.Intera
 			fmt.Sprintf(
 				"Alle Mitglieder der Rolle %s haben auf die Nachricht %s reagiert.",
 				util.MentionRole(role.ID),
-				util.CreateMessageURL(i.GuildID, i.ChannelID, messageID),
+				util.CreateMessageURL(i.GuildID, channelID, messageID),
 			),
 			messages.ColorGreen,
 		))
@@ -273,7 +280,7 @@ func (h *PlayerHandler) CheckReactions(s *discordgo.Session, i *discordgo.Intera
 			"Folgende Mitglieder der Rolle %s haben noch nicht mit %s auf die Nachricht %s reagiert:",
 			util.MentionRole(role.ID),
 			fmt.Sprintf("<%s>", emoji.GlobalID),
-			util.CreateMessageURL(i.GuildID, i.ChannelID, messageID),
+			util.CreateMessageURL(i.GuildID, channelID, messageID),
 		),
 		messages.ColorYellow,
 	))

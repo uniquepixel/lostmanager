@@ -78,3 +78,12 @@ func EmojiOptionByName(name string, options []*discordgo.ApplicationCommandInter
 		GlobalID: v[1 : len(v)-1],
 	}, nil
 }
+
+func ChannelOptionByName(name string, options []*discordgo.ApplicationCommandInteractionDataOption) (*discordgo.Channel, error) {
+	for _, o := range options {
+		if o.Name == name {
+			return o.ChannelValue(nil), nil
+		}
+	}
+	return nil, fmt.Errorf("channel option %s not found", name)
+}

@@ -136,6 +136,12 @@ func playerInteractionCommands(db *gorm.DB, client *goclash.Client) types.Comman
 					MaxLength:   50,
 					Required:    true,
 				},
+				{
+					Type:        discordgo.ApplicationCommandOptionChannel,
+					Name:        handlers.ChannelOptionName,
+					Description: "Channel, in welchem die Nachricht zu finden ist.",
+					Required:    false,
+				},
 			},
 		},
 	}}
