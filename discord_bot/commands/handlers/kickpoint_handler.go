@@ -116,21 +116,36 @@ func (h *KickpointHandler) MemberKickpoints(_ *discordgo.Session, i *discordgo.I
 		return
 	}
 
+	kickpointSum, err := h.kickpoints.KickpointSum(memberTag, clanTag)
+	if err != nil {
+		kickpointSum = 0
+	}
+
 	kickpoints, err := h.kickpoints.ActiveMemberKickpoints(memberTag, settings)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			messages.SendEmbedResponse(i, messages.NewEmbed(
+			fields := make([]*discordgo.MessageEmbedField, 1)
+			fields[0] = &discordgo.MessageEmbedField{
+				Name:   "Gesamtanzahl Kickpunkte",
+				Value:  strconv.Itoa(kickpointSum),
+				Inline: true,
+			}
+
+			embed := messages.NewFieldEmbed(
 				"Keine aktiven Kickpunkte gefunden",
 				"Dieses Mitglied hat keine aktiven Kickpunkte.",
 				messages.ColorRed,
-			))
+				fields,
+			)
+
+			messages.SendEmbedResponse(i, embed)
 			return
 		}
 		messages.SendMemberNotFound(i, memberTag, clanTag)
 		return
 	}
 
-	messages.SendMemberKickpoints(i, settings, kickpoints)
+	messages.SendMemberKickpoints(i, settings, kickpoints, kickpointSum)
 }
 
 func (h *KickpointHandler) KickpointInfo(_ *discordgo.Session, i *discordgo.InteractionCreate) {
