@@ -15,6 +15,7 @@ type IKickpointsRepo interface {
 	ActiveMemberKickpoints(memberTag string, settings *models.ClanSettings) ([]*models.Kickpoint, error)
 	ActiveMemberKickpointsSum(memberTag string, settings *models.ClanSettings) (int, error)
 	FutureMemberKickpoints(memberTag, clanTag string) ([]*models.Kickpoint, error)
+	KickpointSum(memberTag, clanTag string) (int, error)
 	CreateKickpoint(kickpoint *models.Kickpoint) error
 	UpdateKickpoint(kickpoint *models.Kickpoint) (*models.Kickpoint, error)
 	DeleteKickpoint(id uint) error
@@ -99,6 +100,19 @@ func (repo *KickpointsRepo) FutureMemberKickpoints(memberTag, clanTag string) ([
 	}
 
 	return kickpoints, nil
+}
+
+func (repo *KickpointsRepo) KickpointSum(memberTag, clanTag string) (int, error) {
+	var v struct{ Sum int }
+	if err := repo.db.
+		Model(&models.Kickpoint{}).
+		Where("player_tag = ? AND clan_tag = ?", memberTag, clanTag).
+		Select("SUM(amount) as sum").
+		Scan(&v).Error; err != nil {
+		return 0, err
+	}
+
+	return v.Sum, nil
 }
 
 func (repo *KickpointsRepo) CreateKickpoint(kickpoint *models.Kickpoint) error {

@@ -25,8 +25,8 @@ func SendClanKickpoints(i *discordgo.InteractionCreate, clanName string, members
 	))
 }
 
-func SendMemberKickpoints(i *discordgo.InteractionCreate, settings *models.ClanSettings, kickpoints []*models.Kickpoint) {
-	fields := make([]*discordgo.MessageEmbedField, len(kickpoints))
+func SendMemberKickpoints(i *discordgo.InteractionCreate, settings *models.ClanSettings, kickpoints []*models.Kickpoint, kickpointSum int) {
+	fields := make([]*discordgo.MessageEmbedField, len(kickpoints)+1)
 	var sum int
 	for index, k := range kickpoints {
 		sum += k.Amount
@@ -40,6 +40,13 @@ func SendMemberKickpoints(i *discordgo.InteractionCreate, settings *models.ClanS
 
 		fields[index] = field
 	}
+
+	field := discordgo.MessageEmbedField{
+		Name:   "Gesamtanzahl Kickpunkte",
+		Value:  strconv.Itoa(kickpointSum),
+		Inline: true,
+	}
+	fields[len(kickpoints)] = &field
 
 	player := kickpoints[0].Player
 	SendEmbedResponse(i, NewFieldEmbed(
