@@ -216,7 +216,15 @@ func (h *PlayerHandler) CheckReactions(s *discordgo.Session, i *discordgo.Intera
 	emoji, emojiErr := util.EmojiOptionByName(EmojiOptionName, opts)        // emoji to check reactions for
 	channel, _ := util.ChannelOptionByName(ChannelOptionName, opts)         // channel to check reactions for
 
-	channelID := channel.ID
+	if roleErr != nil || emojiErr != nil {
+		messages.SendInvalidInputErr(i, "Bitte gib eine Rolle, die Nachricht-ID und die Emoji-ID an.")
+		return
+	}
+
+	var channelID string
+	if channel != nil {
+		channelID = channel.ID
+	}
 
 	if channelID == "" {
 		channelID = i.ChannelID
@@ -224,7 +232,7 @@ func (h *PlayerHandler) CheckReactions(s *discordgo.Session, i *discordgo.Intera
 
 	slog.Debug("data from CheckReactions", slog.Any("role", role), slog.String("messageID", messageID), slog.Any("emoji", emoji))
 
-	if roleErr != nil || messageID == "" || emojiErr != nil {
+	if messageID == "" {
 		messages.SendInvalidInputErr(i, "Bitte gib eine Rolle, die Nachricht-ID und die Emoji-ID an.")
 		return
 	}
