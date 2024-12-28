@@ -248,10 +248,20 @@ func (h *PlayerHandler) CheckReactions(s *discordgo.Session, i *discordgo.Intera
 		userIDsReacted = append(userIDsReacted, userReacted.ID)
 	}
 
-	members, err := s.GuildMembers(i.GuildID, "", 1000)
-	if err != nil {
-		messages.SendErr(i, "Die Mitglieder des Discord Servers konnten nicht abgerufen werden.")
-		return
+	// Fetch all guild members
+	var members []*discordgo.Member
+	after := ""
+	for {
+		guildMembers, err := s.GuildMembers(i.GuildID, after, 1000)
+		if err != nil {
+			messages.SendErr(i, "Die Mitglieder des Discord Servers konnten nicht abgerufen werden.")
+			return
+		}
+		if len(guildMembers) == 0 {
+			break
+		}
+		members = append(members, guildMembers...)
+		after = guildMembers[len(guildMembers)-1].User.ID
 	}
 
 	var missingUserIDs []string
