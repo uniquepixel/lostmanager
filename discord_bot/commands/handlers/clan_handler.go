@@ -65,11 +65,13 @@ func NewClanHandler(clans repos.IClansRepo, members repos.IMembersRepo, events r
 }
 
 func (h *ClanHandler) CWDonator(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	slog.Info("Received interaction", slog.Any("interactionID", i.ID), slog.Any("interactionType", i.Type))
+
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 	})
 	if err != nil {
-		slog.Error("Failed to send deferred response", slog.Any("err", err))
+		slog.Error("Failed to send deferred response", slog.Any("err", err), slog.Any("interactionID", i.ID))
 		return
 	}
 
@@ -97,6 +99,19 @@ func (h *ClanHandler) CWDonator(s *discordgo.Session, i *discordgo.InteractionCr
 	}
 	clanName := clan.Name
 
+	clanWar, err := h.clashClient.GetCurrentClanWar(clanTag)
+	if err != nil {
+		if err = messages.CreateAndEditEmbed(s, i, "Fehler", "Beim Abrufen der aktuellen Clan Kriegsdaten ist ein Fehler aufgetreten.", messages.ColorRed); err != nil {
+			slog.Error("Failed to edit message.", slog.Any("err", err))
+		}
+		return
+	}
+
+	clanWarPlayerTags := make([]string, len(clanWar.Clan.Members))
+	for index, member := range clanWar.Clan.Members {
+		clanWarPlayerTags[index] = member.Tag
+	}
+
 	var members []*models.ClanMember
 	_, err = h.clans.ClanByTag(clanTag)
 	if err == nil {
@@ -114,19 +129,13 @@ func (h *ClanHandler) CWDonator(s *discordgo.Session, i *discordgo.InteractionCr
 			}
 			return
 		}
-	}
-
-	clanWar, err := h.clashClient.GetCurrentClanWar(clanTag)
-	if err != nil {
-		if err = messages.CreateAndEditEmbed(s, i, "Fehler", "Beim Abrufen der aktuellen Clan Kriegsdaten ist ein Fehler aufgetreten.", messages.ColorRed); err != nil {
-			slog.Error("Failed to edit message.", slog.Any("err", err))
+	} else {
+		for i := 0; i < len(clanWarPlayerTags); i++ {
+			member, _ := h.members.MembersByPlayerTag(clanWarPlayerTags[i])
+			if member != nil {
+				members = append(members, member...)
+			}
 		}
-		return
-	}
-
-	clanWarPlayerTags := make([]string, len(clanWar.Clan.Members))
-	for index, member := range clanWar.Clan.Members {
-		clanWarPlayerTags[index] = member.Tag
 	}
 
 	clanPlayers, err := h.clashClient.GetPlayersWithError(clanWarPlayerTags...)
