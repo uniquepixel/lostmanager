@@ -15,6 +15,13 @@ type Guild struct {
 	MemberRoleID   string
 }
 
+type ServerRoles struct {
+	LeaderRoleIDs   []string
+	CoLeaderRoleIDs []string
+	ElderRoleIDs    []string
+	MemberRoleIDs   []string
+}
+
 func (g *Guild) IsLeader(roles []string) bool {
 	return slices.Contains(roles, g.LeaderRoleID)
 }

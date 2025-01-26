@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 
 	"github.com/bwmarrin/discordgo"
 	"gorm.io/gorm"
@@ -93,8 +94,9 @@ func (m *AuthMiddleware) AuthorizeInteraction(i *discordgo.InteractionCreate, cl
 	return errors.New("member is not a leader")
 }
 
-func (m *AuthMiddleware) AuthorizeInteractionWithMessageEditNoClanNeeded(s *discordgo.Session, i *discordgo.InteractionCreate, clanTag string, role types.AuthRole) error {
+func (m *AuthMiddleware) AuthorizeInteractionWithoutMessageEditNoClanNeeded(s *discordgo.Session, i *discordgo.InteractionCreate, clanTag string, role types.AuthRole) error {
 	user := models.UserFromGuildMember(i.Member)
+
 	if err := m.users.CreateOrUpdateUser(user); err != nil {
 		messages.CreateAndEditEmbed(s, i, "Unbekannter Fehler", "Ein unbekannter Fehler ist aufgetreten.", messages.ColorRed)
 		return err
@@ -108,8 +110,48 @@ func (m *AuthMiddleware) AuthorizeInteractionWithMessageEditNoClanNeeded(s *disc
 	}
 
 	guild, err := m.guilds.GuildByClanTag(i.GuildID, clanTag)
+	if err != nil {
+		guilds, _ := m.guilds.Guilds(models.LostFamilyGuildID)
 
-	if err == nil {
+		var LeaderRoleIDs []string
+		var CoLeaderRoleIDs []string
+		var ElderRoleIDs []string
+		var MemberRoleIDs []string
+
+		for _, guild := range guilds {
+			LeaderRoleIDs = append(LeaderRoleIDs, guild.LeaderRoleID)
+			CoLeaderRoleIDs = append(CoLeaderRoleIDs, guild.CoLeaderRoleID)
+			ElderRoleIDs = append(ElderRoleIDs, guild.ElderRoleID)
+			MemberRoleIDs = append(MemberRoleIDs, guild.MemberRoleID)
+		}
+
+		switch role {
+		case types.AuthRoleMember:
+			for _, r := range i.Member.Roles {
+				if slices.Contains(LeaderRoleIDs, r) || slices.Contains(CoLeaderRoleIDs, r) || slices.Contains(ElderRoleIDs, r) || slices.Contains(MemberRoleIDs, r) {
+					return nil
+				}
+			}
+		case types.AuthRoleElder:
+			for _, r := range i.Member.Roles {
+				if slices.Contains(LeaderRoleIDs, r) || slices.Contains(CoLeaderRoleIDs, r) || slices.Contains(ElderRoleIDs, r) {
+					return nil
+				}
+			}
+		case types.AuthRoleCoLeader:
+			for _, r := range i.Member.Roles {
+				if slices.Contains(LeaderRoleIDs, r) || slices.Contains(CoLeaderRoleIDs, r) {
+					return nil
+				}
+			}
+		case types.AuthRoleLeader:
+			for _, r := range i.Member.Roles {
+				if slices.Contains(LeaderRoleIDs, r) {
+					return nil
+				}
+			}
+		}
+	} else {
 		switch role {
 		case types.AuthRoleMember:
 			if guild.IsMember(i.Member.Roles) {
@@ -128,21 +170,21 @@ func (m *AuthMiddleware) AuthorizeInteractionWithMessageEditNoClanNeeded(s *disc
 				return nil
 			}
 		}
-
-		clan, err := m.clans.ClanByTag(clanTag)
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				messages.CreateAndEditEmbed(s, i, "Ungültiger Clan", fmt.Sprintf("Der Clan mit dem ClanTag '%s' ist nicht Teil dieses Discord Servers.", clanTag), messages.ColorRed)
-			} else {
-				slog.Error("Error getting clan by tag.", slog.Any("err", err))
-				messages.CreateAndEditEmbed(s, i, "Unbekannter Fehler", "Ein unbekannter Fehler ist aufgetreten.", messages.ColorRed)
-			}
-		}
-
-		messages.CreateAndEditEmbed(s, i, "Keine Berechtigung", fmt.Sprintf("Um diesen Befehl ausführen zu können, musst du %s in %s sein.", role.String(), clan.Name), messages.ColorRed)
-		return errors.New("member is not a leader")
 	}
-	return nil
+
+	// clan, err := m.clans.ClanByTag(clanTag)
+	// if err != nil {
+	// 	if errors.Is(err, gorm.ErrRecordNotFound) {
+	// 		messages.CreateAndEditEmbed(s, i, "Ungültiger Clan", fmt.Sprintf("Der Clan mit dem ClanTag '%s' ist nicht Teil dieses Discord Servers.", clanTag), messages.ColorRed)
+	// 	} else {
+	// 		slog.Error("Error getting clan by tag.", slog.Any("err", err))
+	// 		messages.CreateAndEditEmbed(s, i, "Unbekannter Fehler", "Ein unbekannter Fehler ist aufgetreten.", messages.ColorRed)
+	// 	}
+	// 	return err
+	// }
+
+	// messages.CreateAndEditEmbed(s, i, "Keine Berechtigung", fmt.Sprintf("Um diesen Befehl ausführen zu können, musst du %s sein.", role.String()), messages.ColorRed)
+	return errors.New("member is not a leader")
 }
 
 func (m *AuthMiddleware) sendClanNotInGuildError(i *discordgo.InteractionCreate, clanTag string) {

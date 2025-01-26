@@ -65,6 +65,9 @@ func NewClanHandler(clans repos.IClansRepo, members repos.IMembersRepo, events r
 }
 
 func (h *ClanHandler) CWDonator(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	var noPings bool
+	noPings = false
+
 	slog.Info("Received interaction", slog.Any("interactionID", i.ID), slog.Any("interactionType", i.Type))
 
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -85,8 +88,8 @@ func (h *ClanHandler) CWDonator(s *discordgo.Session, i *discordgo.InteractionCr
 		return
 	}
 
-	if err = h.auth.AuthorizeInteractionWithMessageEditNoClanNeeded(s, i, clanTag, types.AuthRoleCoLeader); err != nil {
-		return
+	if err = h.auth.AuthorizeInteractionWithoutMessageEditNoClanNeeded(s, i, clanTag, types.AuthRoleCoLeader); err != nil {
+		noPings = true
 	}
 
 	clan, err := h.clashClient.GetClan(clanTag)
@@ -113,27 +116,30 @@ func (h *ClanHandler) CWDonator(s *discordgo.Session, i *discordgo.InteractionCr
 	}
 
 	var members []*models.ClanMember
-	_, err = h.clans.ClanByTag(clanTag)
-	if err == nil {
-		members, err = h.members.MembersByClanTag(clanTag)
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				if err = messages.CreateAndEditEmbed(s, i, "Clan hat keine Mitglieder", fmt.Sprintf("Der Clan '%s' hat keine Mitglieder.", clanName), messages.ColorRed); err != nil {
+
+	if noPings == false {
+		_, err = h.clans.ClanByTag(clanTag)
+		if err == nil {
+			members, err = h.members.MembersByClanTag(clanTag)
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					if err = messages.CreateAndEditEmbed(s, i, "Clan hat keine Mitglieder", fmt.Sprintf("Der Clan '%s' hat keine Mitglieder.", clanName), messages.ColorRed); err != nil {
+						slog.Error("Failed to edit message.", slog.Any("err", err))
+					}
+					return
+				}
+
+				if err = messages.CreateAndEditEmbed(s, i, "Unbekannter Fehler", "Es ist ein unbekannter Fehler aufgetreten.", messages.ColorRed); err != nil {
 					slog.Error("Failed to edit message.", slog.Any("err", err))
 				}
 				return
 			}
-
-			if err = messages.CreateAndEditEmbed(s, i, "Unbekannter Fehler", "Es ist ein unbekannter Fehler aufgetreten.", messages.ColorRed); err != nil {
-				slog.Error("Failed to edit message.", slog.Any("err", err))
-			}
-			return
-		}
-	} else {
-		for i := 0; i < len(clanWarPlayerTags); i++ {
-			member, _ := h.members.MembersByPlayerTag(clanWarPlayerTags[i])
-			if member != nil {
-				members = append(members, member...)
+		} else {
+			for i := 0; i < len(clanWarPlayerTags); i++ {
+				member, _ := h.members.MembersByPlayerTag(clanWarPlayerTags[i])
+				if member != nil {
+					members = append(members, member...)
+				}
 			}
 		}
 	}
