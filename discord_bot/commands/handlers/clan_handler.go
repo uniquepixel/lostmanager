@@ -83,11 +83,11 @@ func (h *ClanHandler) CWDonator(s *discordgo.Session, i *discordgo.InteractionCr
 		return
 	}
 
-	if err = h.auth.AuthorizeInteractionWithMessageEdit(s, i, clanTag, types.AuthRoleCoLeader); err != nil {
+	if err = h.auth.AuthorizeInteractionWithMessageEditNoClanNeeded(s, i, clanTag, types.AuthRoleCoLeader); err != nil {
 		return
 	}
 
-	clanName, err := h.clans.ClanNameByTag(clanTag)
+	clan, err := h.clashClient.GetClan(clanTag)
 	if err != nil {
 		err = messages.CreateAndEditEmbed(s, i, "Clan nicht gefunden", fmt.Sprintf("Der Clan mit dem Tag `%s` konnte nicht gefunden werden. Stelle sicher, dass du den Clan aus der Liste ausgewählt hast, oder direkt einen Clan Tag eingegeben hast.", clanTag), messages.ColorRed)
 		if err != nil {
@@ -95,20 +95,25 @@ func (h *ClanHandler) CWDonator(s *discordgo.Session, i *discordgo.InteractionCr
 		}
 		return
 	}
+	clanName := clan.Name
 
-	members, err := h.members.MembersByClanTag(clanTag)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			if err = messages.CreateAndEditEmbed(s, i, "Clan hat keine Mitglieder", fmt.Sprintf("Der Clan '%s' hat keine Mitglieder.", clanName), messages.ColorRed); err != nil {
+	var members []*models.ClanMember
+	_, err = h.clans.ClanByTag(clanTag)
+	if err == nil {
+		members, err = h.members.MembersByClanTag(clanTag)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				if err = messages.CreateAndEditEmbed(s, i, "Clan hat keine Mitglieder", fmt.Sprintf("Der Clan '%s' hat keine Mitglieder.", clanName), messages.ColorRed); err != nil {
+					slog.Error("Failed to edit message.", slog.Any("err", err))
+				}
+				return
+			}
+
+			if err = messages.CreateAndEditEmbed(s, i, "Unbekannter Fehler", "Es ist ein unbekannter Fehler aufgetreten.", messages.ColorRed); err != nil {
 				slog.Error("Failed to edit message.", slog.Any("err", err))
 			}
 			return
 		}
-
-		if err = messages.CreateAndEditEmbed(s, i, "Unbekannter Fehler", "Es ist ein unbekannter Fehler aufgetreten.", messages.ColorRed); err != nil {
-			slog.Error("Failed to edit message.", slog.Any("err", err))
-		}
-		return
 	}
 
 	clanWar, err := h.clashClient.GetCurrentClanWar(clanTag)
