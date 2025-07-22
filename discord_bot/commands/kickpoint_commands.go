@@ -8,6 +8,7 @@ import (
 	"bot/commands/middleware"
 	"bot/commands/repos"
 	"bot/commands/util"
+	"bot/commands/validation"
 	"bot/types"
 )
 
@@ -46,8 +47,18 @@ func kickpointInteractionCommands(db *gorm.DB) types.Commands[types.InteractionH
 			Type:         discordgo.ChatApplicationCommand,
 			DMPermission: util.BoolPtr(false),
 			Options: []*discordgo.ApplicationCommandOption{
-				optionClanTag("Clan, aus dem das Mitglied stammt."),
-				optionMemberTag("ClanMember, dessen Kickpunkte angezeigt werden sollen."),
+				// optionClanTag("Clan, aus dem das Mitglied stammt."),
+				// optionMemberTag("ClanMember, dessen Kickpunkte angezeigt werden sollen."),
+				optionPlayerTag("Player, dessen Kickpunkte angezeigt werden sollen."),
+				{
+					Name:         handlers.ClanTagOptionName,
+					Description:  "Clan, aus dem das Mitglied stammt.",
+					Type:         discordgo.ApplicationCommandOptionString,
+					Required:     false,
+					Autocomplete: true,
+					MinLength:    util.IntPtr(validation.TagMinLength),
+					MaxLength:    validation.TagMaxLength,
+				},
 			},
 		}}, {
 		Handler: types.InteractionHandler{

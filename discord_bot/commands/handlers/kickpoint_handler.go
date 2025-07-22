@@ -100,33 +100,33 @@ func (h *KickpointHandler) ClanKickpoints(_ *discordgo.Session, i *discordgo.Int
 func (h *KickpointHandler) MemberKickpoints(_ *discordgo.Session, i *discordgo.InteractionCreate) {
 	opts := i.ApplicationCommandData().Options
 	clanTag := util.StringOptionByName(ClanTagOptionName, opts)
-	memberTag := util.StringOptionByName(MemberTagOptionName, opts)
-	if clanTag == "" || memberTag == "" {
-		messages.SendInvalidInputErr(i, "Du musst einen Clan und ein Mitglied angeben.")
+	playerTag := util.StringOptionByName(PlayerTagOptionName, opts)
+	if playerTag == "" {
+		messages.SendInvalidInputErr(i, "Du musst ein Mitglied angeben.")
 		return
 	}
 
-	if err := h.auth.AuthorizeInteraction(i, clanTag, types.AuthRoleMember); err != nil {
-		return
-	}
+	// if err := h.auth.AuthorizeInteraction(i, clanTag, types.AuthRoleMember); err != nil {
+	// 	return
+	// }
 
-	settings, err := h.clanSettings.ClanSettingsPreload(clanTag)
-	if err != nil {
-		messages.SendClanNotFound(i, clanTag)
-		return
-	}
+	// settings, err := h.clanSettings.ClanSettingsPreload(clanTag)
+	// if err != nil {
+	// 	messages.SendClanNotFound(i, clanTag)
+	// 	return
+	// }
 
-	kickpointSum, err := h.kickpoints.KickpointSum(memberTag, clanTag)
+	kickpointSum, err := h.kickpoints.KickpointSum(playerTag)
 	if err != nil {
 		kickpointSum = 0
 	}
 
-	kickpoints, err := h.kickpoints.ActiveMemberKickpoints(memberTag, settings)
+	kickpoints, err := h.kickpoints.ActiveMemberKickpoints(playerTag)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			fields := make([]*discordgo.MessageEmbedField, 1)
 			fields[0] = &discordgo.MessageEmbedField{
-				Name:   "Gesamtanzahl Kickpunkte",
+				Name:   "Gesamtanzahl (Vergangene und aktuelle Kickpunkte)",
 				Value:  strconv.Itoa(kickpointSum),
 				Inline: true,
 			}
@@ -141,11 +141,11 @@ func (h *KickpointHandler) MemberKickpoints(_ *discordgo.Session, i *discordgo.I
 			messages.SendEmbedResponse(i, embed)
 			return
 		}
-		messages.SendMemberNotFound(i, memberTag, clanTag)
+		messages.SendMemberNotFound(i, playerTag, clanTag)
 		return
 	}
 
-	messages.SendMemberKickpoints(i, settings, kickpoints, kickpointSum)
+	messages.SendMemberKickpoints(i, kickpoints, kickpointSum)
 }
 
 func (h *KickpointHandler) KickpointInfo(_ *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -281,7 +281,7 @@ func (h *KickpointHandler) CreateKickpointModal(s *discordgo.Session, i *discord
 		return
 	}
 
-	totalKickpoints, err := h.kickpoints.ActiveMemberKickpointsSum(memberTag, settings)
+	totalKickpoints, err := h.kickpoints.ActiveMemberKickpointsSum(memberTag)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		messages.SendUnknownErr(i)
 		return
@@ -349,8 +349,9 @@ func (h *KickpointHandler) CreateKickpointModalSubmit(_ *discordgo.Session, i *d
 		return
 	}
 
-	if minDate := util.KickpointMinDate(settings.KickpointsExpireAfterDays); minDate.After(date) {
-		messages.SendInvalidInputErr(i, fmt.Sprintf("Es können keine Kickpunkte vor %s vergeben werden, da diese schon abgelaufen wären.", util.FormatDate(minDate)))
+	mindate := util.KickpointMinDate(settings.KickpointsExpireAfterDays)
+	if mindate.After(date) {
+		messages.SendInvalidInputErr(i, fmt.Sprintf("Es können keine Kickpunkte vor %s vergeben werden, da diese schon abgelaufen wären.", util.FormatDate(mindate)))
 		return
 	}
 
@@ -361,6 +362,7 @@ func (h *KickpointHandler) CreateKickpointModalSubmit(_ *discordgo.Session, i *d
 	}
 
 	playerTag := util.ParseStringModalInput(data.Components[3])
+	expiryDate := mindate.AddDate(0, 0, settings.KickpointsExpireAfterDays)
 
 	_, userID, _ := util.ParseCustomID(data.CustomID)
 	kickpoint := &models.Kickpoint{
@@ -371,6 +373,7 @@ func (h *KickpointHandler) CreateKickpointModalSubmit(_ *discordgo.Session, i *d
 		ClanTag:            clanTag,
 		CreatedByDiscordID: userID,
 		UpdatedByDiscordID: userID,
+		ExpiresAt:          expiryDate,
 	}
 
 	playerName, err := h.players.NameByTag(kickpoint.PlayerTag)
@@ -394,11 +397,11 @@ func (h *KickpointHandler) CreateKickpointModalSubmit(_ *discordgo.Session, i *d
 		messages.ColorGreen,
 		append([]*discordgo.MessageEmbedField{
 			{Name: "Mitglied", Value: fmt.Sprintf("%s in %s", playerName, settings.Clan.Name)}},
-			messages.DetailedKickpointFields(kickpoint, settings.KickpointsExpireAfterDays)...,
+			messages.DetailedKickpointFields(kickpoint)...,
 		),
 	))
 
-	totalKickpoints, err := h.kickpoints.ActiveMemberKickpointsSum(kickpoint.PlayerTag, settings)
+	totalKickpoints, err := h.kickpoints.ActiveMemberKickpointsSum(kickpoint.PlayerTag)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return
 	}
@@ -500,11 +503,11 @@ func (h *KickpointHandler) EditKickpointModalSubmit(_ *discordgo.Session, i *dis
 		return
 	}
 
-	settings, err := h.clanSettings.ClanSettings(prevKickpoint.ClanTag)
-	if err != nil {
-		messages.SendClanNotFound(i, prevKickpoint.ClanTag)
-		return
-	}
+	// settings, err := h.clanSettings.ClanSettings(prevKickpoint.ClanTag)
+	// if err != nil {
+	// 	messages.SendClanNotFound(i, prevKickpoint.ClanTag)
+	// 	return
+	// }
 
 	updatedKickpoint := &models.Kickpoint{
 		ID:                 prevKickpoint.ID,
@@ -530,7 +533,7 @@ func (h *KickpointHandler) EditKickpointModalSubmit(_ *discordgo.Session, i *dis
 		messages.ColorGreen,
 		append([]*discordgo.MessageEmbedField{
 			{Name: "Mitglied", Value: fmt.Sprintf("%s in %s", updatedKickpoint.Player.Name, updatedKickpoint.Clan.Name)}},
-			messages.DetailedKickpointFields(updatedKickpoint, settings.KickpointsExpireAfterDays)...,
+			messages.DetailedKickpointFields(updatedKickpoint)...,
 		),
 	))
 }
@@ -571,7 +574,7 @@ func (h *KickpointHandler) DeleteKickpoint(_ *discordgo.Session, i *discordgo.In
 		fmt.Sprintf("Kickpunkt #%d gelöscht", kickpoint.ID),
 		fmt.Sprintf("Der Kickpunkt von %s in %s wurde gelöscht!", kickpoint.Player.Name, kickpoint.Clan.Name),
 		messages.ColorGreen,
-		messages.DetailedKickpointFields(kickpoint, 0),
+		messages.DetailedKickpointFields(kickpoint),
 	))
 }
 
@@ -716,6 +719,8 @@ func (h *KickpointHandler) HandleAutocomplete(_ *discordgo.Session, i *discordgo
 			autocompleteMembers(i, h.players, opt.StringValue(), util.StringOptionByName(ClanTagOptionName, opts))
 		case ReasonOptionName:
 			h.autocompleteKickpointReason(i, opt.StringValue(), util.StringOptionByName(ClanTagOptionName, opts))
+		case PlayerTagOptionName:
+			autocompletePlayers(i, h.players, opt.StringValue())
 		}
 	}
 }

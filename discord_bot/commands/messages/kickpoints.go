@@ -25,7 +25,7 @@ func SendClanKickpoints(i *discordgo.InteractionCreate, clanName string, members
 	))
 }
 
-func SendMemberKickpoints(i *discordgo.InteractionCreate, settings *models.ClanSettings, kickpoints []*models.Kickpoint, kickpointSum int) {
+func SendMemberKickpoints(i *discordgo.InteractionCreate, kickpoints []*models.Kickpoint, kickpointSum int) {
 	fields := make([]*discordgo.MessageEmbedField, len(kickpoints)+1)
 	var sum int
 	for index, k := range kickpoints {
@@ -34,7 +34,7 @@ func SendMemberKickpoints(i *discordgo.InteractionCreate, settings *models.ClanS
 			Name: fmt.Sprintf("Kickpunkt #%d", k.ID),
 		}
 
-		for _, f := range DetailedKickpointFields(k, settings.KickpointsExpireAfterDays) {
+		for _, f := range DetailedKickpointFields(k) {
 			field.Value += fmt.Sprintf("%s: %s\n", f.Name, f.Value)
 		}
 
@@ -42,7 +42,7 @@ func SendMemberKickpoints(i *discordgo.InteractionCreate, settings *models.ClanS
 	}
 
 	field := discordgo.MessageEmbedField{
-		Name:   "Gesamtanzahl Kickpunkte",
+		Name:   "Gesamtanzahl (Vergangene und aktuelle Kickpunkte)",
 		Value:  strconv.Itoa(kickpointSum),
 		Inline: true,
 	}
@@ -51,18 +51,18 @@ func SendMemberKickpoints(i *discordgo.InteractionCreate, settings *models.ClanS
 	player := kickpoints[0].Player
 	SendEmbedResponse(i, NewFieldEmbed(
 		"Aktive Kickpunkte",
-		fmt.Sprintf("Aktive Kickpunkte von %s (%s) in %s\n**Gesamt: %d/%d Kickpunkte**", player.Name, player.CocTag, settings.Clan.Name, sum, settings.MaxKickpoints),
+		fmt.Sprintf("Aktive Kickpunkte von %s (%s) in %s\n**Gesamt: %d/%d Kickpunkte**", player.Name, player.CocTag, "settings.Clan.Name", sum, 999),
 		ColorAqua,
 		fields,
 	))
 }
 
-func DetailedKickpointFields(kickpoint *models.Kickpoint, expireAfterDays int) []*discordgo.MessageEmbedField {
+func DetailedKickpointFields(kickpoint *models.Kickpoint) []*discordgo.MessageEmbedField {
 	return []*discordgo.MessageEmbedField{
 		{Name: "Grund", Value: kickpoint.Description},
 		{Name: "Anzahl Kickpunkte", Value: strconv.Itoa(kickpoint.Amount), Inline: true},
 		{Name: "Erhalten am", Value: util.FormatDate(kickpoint.Date), Inline: true},
-		{Name: "Läuft ab in", Value: util.FormatDuration(time.Until(kickpoint.Date.AddDate(0, 0, expireAfterDays))), Inline: true},
+		{Name: "Läuft ab in", Value: util.FormatDuration(time.Until(kickpoint.ExpiresAt)), Inline: true},
 		{Name: "Aktiv seit", Value: util.FormatDuration(time.Since(kickpoint.Date)), Inline: true},
 		{Name: "Erstellt", Value: util.FormatFromAt(kickpoint.CreatedByUser, kickpoint.CreatedAt), Inline: true},
 		{Name: "Zuletzt bearbeitet", Value: util.FormatFromAt(kickpoint.UpdatedByUser, kickpoint.UpdatedAt), Inline: true},
