@@ -57,7 +57,7 @@ func (repo *KickpointsRepo) ActiveMemberKickpoints(memberTag string) ([]*models.
 	if err := repo.db.
 		Preload(clause.Associations).
 		Order("created_at").
-		Find(&kickpoints, "player_tag = ? AND expiresAt > NOW()", memberTag).Error; err != nil {
+		Find(&kickpoints, "player_tag = ? AND expires_at > NOW()", memberTag).Error; err != nil {
 		return nil, err
 	}
 
@@ -72,7 +72,7 @@ func (repo *KickpointsRepo) ActiveMemberKickpointsSum(memberTag string) (int, er
 	var v struct{ Sum int }
 	if err := repo.db.
 		Model(&models.Kickpoint{}).
-		Where("player_tag = ? AND expiresAt > NOW()", memberTag).
+		Where("player_tag = ? AND expires_at > NOW()", memberTag).
 		Select("SUM(amount) as sum").
 		Scan(&v).Error; err != nil {
 		return 0, err

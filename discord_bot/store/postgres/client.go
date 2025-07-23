@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm/logger"
 
 	"bot/env"
+	"bot/store/postgres/models"
 )
 
 const (
@@ -50,22 +51,22 @@ func newGormClient() (client *gorm.DB, err error) {
 			continue
 		}
 
-		// if err := client.AutoMigrate(
-		// 	&models.ClanEventMember{},
-		// 	&models.ClanEvent{},
-		// 	// &models.ClanMember{},
-		// 	// &models.ClanSettings{},
-		// 	&models.Clan{},
-		// 	&models.Guild{},
-		// 	&models.KickpointReason{},
-		// 	&models.Kickpoint{},
-		// 	&models.MemberState{},
-		// 	// &models.Player{},
-		// 	&models.User{},
-		// 	// &AnotherModel{},
-		// ); err != nil {
-		// 	panic(err)
-		// }
+		if err := client.AutoMigrate(
+			// &models.ClanEventMember{},
+			// &models.ClanEvent{},
+			// &models.ClanMember{},
+			// &models.ClanSettings{},
+			// &models.Clan{},
+			// &models.Guild{},
+			// &models.KickpointReason{},
+			&models.Kickpoint{},
+			// &models.MemberState{},
+			// &models.Player{},
+			// &models.User{},
+			// &AnotherModel{},
+		); err != nil {
+			panic(err)
+		}
 
 		log.Println("Connected to postgres database.")
 		return client, nil

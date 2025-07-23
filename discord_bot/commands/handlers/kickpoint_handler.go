@@ -45,17 +45,19 @@ type KickpointHandler struct {
 	reasons      repos.IKickpointReasonsRepo
 	clans        repos.IClansRepo
 	players      repos.IPlayersRepo
+	members      repos.IMembersRepo
 	clanSettings repos.IClanSettingsRepo
 	memberStates repos.IMemberStatesRepo
 	auth         middleware.AuthMiddleware
 }
 
-func NewKickpointHandler(kickpoints repos.IKickpointsRepo, reasons repos.IKickpointReasonsRepo, clans repos.IClansRepo, players repos.IPlayersRepo, clanSettings repos.IClanSettingsRepo, memberStates repos.IMemberStatesRepo, auth middleware.AuthMiddleware) IKickpointHandler {
+func NewKickpointHandler(kickpoints repos.IKickpointsRepo, reasons repos.IKickpointReasonsRepo, clans repos.IClansRepo, players repos.IPlayersRepo, members repos.IMembersRepo, clanSettings repos.IClanSettingsRepo, memberStates repos.IMemberStatesRepo, auth middleware.AuthMiddleware) IKickpointHandler {
 	return &KickpointHandler{
 		kickpoints:   kickpoints,
 		reasons:      reasons,
 		clans:        clans,
 		players:      players,
+		members:      members,
 		clanSettings: clanSettings,
 		memberStates: memberStates,
 		auth:         auth,
@@ -99,7 +101,6 @@ func (h *KickpointHandler) ClanKickpoints(_ *discordgo.Session, i *discordgo.Int
 
 func (h *KickpointHandler) MemberKickpoints(_ *discordgo.Session, i *discordgo.InteractionCreate) {
 	opts := i.ApplicationCommandData().Options
-	clanTag := util.StringOptionByName(ClanTagOptionName, opts)
 	playerTag := util.StringOptionByName(PlayerTagOptionName, opts)
 	if playerTag == "" {
 		messages.SendInvalidInputErr(i, "Du musst ein Mitglied angeben.")
@@ -110,11 +111,23 @@ func (h *KickpointHandler) MemberKickpoints(_ *discordgo.Session, i *discordgo.I
 	// 	return
 	// }
 
-	// settings, err := h.clanSettings.ClanSettingsPreload(clanTag)
-	// if err != nil {
-	// 	messages.SendClanNotFound(i, clanTag)
-	// 	return
-	// }
+	var maxKickpoints, clanName string
+	members, err := h.members.MembersByPlayerTag(playerTag)
+	if err == nil && len(members) > 0 {
+		clanTag := members[0].ClanTag
+
+		settings, err := h.clanSettings.ClanSettingsPreload(clanTag)
+		if err != nil {
+			messages.SendClanNotFound(i, clanTag)
+			return
+		}
+
+		maxKickpoints = strconv.Itoa(settings.MaxKickpoints)
+		clanName = settings.Clan.Name
+	} else {
+		maxKickpoints = "???"
+		clanName = "aktuell keinem Clan"
+	}
 
 	kickpointSum, err := h.kickpoints.KickpointSum(playerTag)
 	if err != nil {
@@ -141,11 +154,11 @@ func (h *KickpointHandler) MemberKickpoints(_ *discordgo.Session, i *discordgo.I
 			messages.SendEmbedResponse(i, embed)
 			return
 		}
-		messages.SendMemberNotFound(i, playerTag, clanTag)
+		messages.SendUnknownErr(i)
 		return
 	}
 
-	messages.SendMemberKickpoints(i, kickpoints, kickpointSum)
+	messages.SendMemberKickpoints(i, kickpoints, kickpointSum, maxKickpoints, clanName)
 }
 
 func (h *KickpointHandler) KickpointInfo(_ *discordgo.Session, i *discordgo.InteractionCreate) {
