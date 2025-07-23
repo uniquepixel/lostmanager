@@ -375,7 +375,7 @@ func (h *KickpointHandler) CreateKickpointModalSubmit(_ *discordgo.Session, i *d
 	}
 
 	playerTag := util.ParseStringModalInput(data.Components[3])
-	expiryDate := mindate.AddDate(0, 0, settings.KickpointsExpireAfterDays)
+	expiryDate := date.AddDate(0, 0, settings.KickpointsExpireAfterDays)
 
 	_, userID, _ := util.ParseCustomID(data.CustomID)
 	kickpoint := &models.Kickpoint{
