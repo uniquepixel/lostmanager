@@ -14,10 +14,11 @@ type Kickpoint struct {
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	ExpiresAt time.Time
 
-	Member        *ClanMember `gorm:"foreignKey:PlayerTag,ClanTag;references:PlayerTag,ClanTag"`
-	Clan          *Clan       `gorm:"foreignKey:Tag;references:ClanTag"`
-	Player        *Player     `gorm:"foreignKey:CocTag;references:PlayerTag"`
-	CreatedByUser *User       `gorm:"foreignKey:DiscordID;references:CreatedByDiscordID"`
-	UpdatedByUser *User       `gorm:"foreignKey:DiscordID;references:UpdatedByDiscordID"`
+	// Member        *ClanMember `gorm:"foreignKey:PlayerTag,ClanTag;references:PlayerTag,ClanTag"`
+	Clan          *Clan   `gorm:"foreignKey:Tag;references:ClanTag"`
+	Player        *Player `gorm:"foreignKey:CocTag;references:PlayerTag"`
+	CreatedByUser *User   `gorm:"foreignKey:DiscordID;references:CreatedByDiscordID"`
+	UpdatedByUser *User   `gorm:"foreignKey:DiscordID;references:UpdatedByDiscordID"`
 }
