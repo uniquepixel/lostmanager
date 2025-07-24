@@ -33,7 +33,7 @@ func NewPlayersRepo(db *gorm.DB) IPlayersRepo {
 func (repo *PlayersRepo) Players(query string) (models.Players, error) {
 	var players models.Players
 	err := repo.db.
-		Preload("Members.Clan").
+		Preload("Member.Clan").
 		Scopes(
 			postgres.WithLimit(types.MaxCommandChoices),
 			postgres.WithSearchQuery(query, "name", "coc_tag", "discord_id"),
