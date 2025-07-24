@@ -20,8 +20,15 @@ type Players []*Player
 func (players Players) Choices() []*discordgo.ApplicationCommandOptionChoice {
 	choices := make([]*discordgo.ApplicationCommandOptionChoice, len(players))
 	for i, player := range players {
+		name := fmt.Sprintf("%s (%s)", player.Name, player.CocTag)
+		
+		// Add clan name if player is a member of any clan
+		if len(player.Members) > 0 && player.Members[0].Clan != nil {
+			name = fmt.Sprintf("%s - %s", name, player.Members[0].Clan.Name)
+		}
+		
 		choices[i] = &discordgo.ApplicationCommandOptionChoice{
-			Name:  fmt.Sprintf("%s (%s)", player.Name, player.CocTag),
+			Name:  name,
 			Value: player.CocTag,
 		}
 	}
