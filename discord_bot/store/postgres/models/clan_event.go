@@ -11,5 +11,5 @@ type ClanEvent struct {
 	ChannelID       string    `gorm:"not null"`
 	WinnerPlayerTag *string   `gorm:"default:null"`
 
-	Clan *Clan `gorm:"foreignKey:Tag;references:ClanTag"`
+	Clan *Clan `gorm:"foreignKey:ClanTag;references:Tag;constraint:OnDelete:CASCADE"`
 }

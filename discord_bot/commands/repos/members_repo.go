@@ -1,6 +1,9 @@
 package repos
 
 import (
+	"errors"
+	"fmt"
+
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -13,7 +16,9 @@ type IMembersRepo interface {
 	MemberByID(playerTag, clanTag string) (*models.ClanMember, error)
 	MembersByTag(clanTag string, playerTags ...string) (models.ClanMembers, error)
 	MembersByPlayerTag(playerTag string) (models.ClanMembers, error)
+	GetPlayerCurrentClan(playerTag string) (*models.ClanMember, error)
 	CreateMember(member *models.ClanMember) error
+	TransferMember(playerTag, fromClanTag, toClanTag string, newRole models.ClanRole, transferredByDiscordID string) error
 	UpdateMemberRole(playerTag, clanTag string, role models.ClanRole) error
 	DeleteMember(tag, clanTag string) error
 }
@@ -40,12 +45,14 @@ func (repo *MembersRepo) MembersByClanTag(clanTag string) (models.ClanMembers, e
 func (repo *MembersRepo) MembersByDiscordID(discordID string) (models.ClanMembers, error) {
 	var players []*models.Player
 	err := repo.db.
-		Preload("ClanMembers").
+		Preload("Member").
 		Find(&players, "discord_id = ?", discordID).Error
 
 	var members models.ClanMembers
 	for _, player := range players {
-		members = append(members, player.Members...)
+		if player.Member != nil {
+			members = append(members, player.Member)
+		}
 	}
 
 	return members, err
@@ -75,6 +82,14 @@ func (repo *MembersRepo) MembersByPlayerTag(playerTag string) (models.ClanMember
 	return members, err
 }
 
+func (repo *MembersRepo) GetPlayerCurrentClan(playerTag string) (*models.ClanMember, error) {
+	var member *models.ClanMember
+	err := repo.db.
+		Preload(clause.Associations).
+		First(&member, "player_tag = ?", playerTag).Error
+	return member, err
+}
+
 func (repo *MembersRepo) MissingClanMembers(clanTag string, playerTags ...string) (models.ClanMembers, error) {
 	var members models.ClanMembers
 	err := repo.db.
@@ -84,7 +99,37 @@ func (repo *MembersRepo) MissingClanMembers(clanTag string, playerTags ...string
 }
 
 func (repo *MembersRepo) CreateMember(member *models.ClanMember) error {
+	// Check if the player is already in any clan
+	existingMember, err := repo.GetPlayerCurrentClan(member.PlayerTag)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	
+	// If player is already in a clan, return an error
+	if existingMember != nil && err == nil {
+		return fmt.Errorf("player %s is already a member of clan %s", member.PlayerTag, existingMember.ClanTag)
+	}
+	
 	return repo.db.Create(member).Error
+}
+
+func (repo *MembersRepo) TransferMember(playerTag, fromClanTag, toClanTag string, newRole models.ClanRole, transferredByDiscordID string) error {
+	return repo.db.Transaction(func(tx *gorm.DB) error {
+		// Delete from old clan
+		if err := tx.Delete(&models.ClanMember{}, "player_tag = ? AND clan_tag = ?", playerTag, fromClanTag).Error; err != nil {
+			return err
+		}
+		
+		// Add to new clan
+		newMember := &models.ClanMember{
+			PlayerTag:        playerTag,
+			ClanTag:          toClanTag,
+			ClanRole:         newRole,
+			AddedByDiscordID: transferredByDiscordID,
+		}
+		
+		return tx.Create(newMember).Error
+	})
 }
 
 func (repo *MembersRepo) UpdateMemberRole(playerTag, clanTag string, role models.ClanRole) error {

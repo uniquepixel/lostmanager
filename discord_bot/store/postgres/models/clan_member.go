@@ -6,8 +6,8 @@ type ClanMember struct {
 	AddedByDiscordID string
 	ClanRole         ClanRole
 
-	Player *Player `gorm:"foreignKey:CocTag;references:PlayerTag"`
-	Clan   *Clan   `gorm:"foreignKey:Tag;references:ClanTag"`
+	Player *Player `gorm:"foreignKey:PlayerTag;references:CocTag;constraint:OnDelete:CASCADE"`
+	Clan   *Clan   `gorm:"foreignKey:ClanTag;references:Tag;constraint:OnDelete:CASCADE"`
 }
 
 type ClanRole string

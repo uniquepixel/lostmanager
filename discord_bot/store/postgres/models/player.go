@@ -12,7 +12,8 @@ type Player struct {
 	Name      string `gorm:"not null"`
 	DiscordID string
 
-	Members ClanMembers `gorm:"foreignKey:PlayerTag;references:CocTag"`
+	// A player can only be in one clan at a time
+	Member *ClanMember `gorm:"foreignKey:PlayerTag;references:CocTag;constraint:false"`
 }
 
 type Players []*Player
@@ -22,9 +23,9 @@ func (players Players) Choices() []*discordgo.ApplicationCommandOptionChoice {
 	for i, player := range players {
 		name := fmt.Sprintf("%s (%s)", player.Name, player.CocTag)
 		
-		// Add clan name if player is a member of any clan
-		if len(player.Members) > 0 && player.Members[0].Clan != nil {
-			name = fmt.Sprintf("%s - %s", name, player.Members[0].Clan.Name)
+		// Add clan name if player is a member of a clan
+		if player.Member != nil && player.Member.Clan != nil {
+			name = fmt.Sprintf("%s - %s", name, player.Member.Clan.Name)
 		}
 		
 		choices[i] = &discordgo.ApplicationCommandOptionChoice{

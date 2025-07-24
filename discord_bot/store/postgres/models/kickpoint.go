@@ -17,8 +17,8 @@ type Kickpoint struct {
 	ExpiresAt time.Time
 
 	// Member        *ClanMember `gorm:"foreignKey:PlayerTag,ClanTag;references:PlayerTag,ClanTag"`
-	Clan          *Clan   `gorm:"foreignKey:Tag;references:ClanTag"`
-	Player        *Player `gorm:"foreignKey:CocTag;references:PlayerTag"`
-	CreatedByUser *User   `gorm:"foreignKey:DiscordID;references:CreatedByDiscordID"`
-	UpdatedByUser *User   `gorm:"foreignKey:DiscordID;references:UpdatedByDiscordID"`
+	Clan          *Clan   `gorm:"foreignKey:ClanTag;references:Tag;constraint:OnDelete:CASCADE"`
+	Player        *Player `gorm:"foreignKey:PlayerTag;references:CocTag;constraint:OnDelete:CASCADE"`
+	CreatedByUser *User   `gorm:"foreignKey:CreatedByDiscordID;references:DiscordID"`
+	UpdatedByUser *User   `gorm:"foreignKey:UpdatedByDiscordID;references:DiscordID"`
 }

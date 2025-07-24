@@ -12,7 +12,7 @@ type ClanSettings struct {
 	UpdatedAt                 time.Time
 	UpdatedByDiscordID        *string
 
-	Clan             *Clan              `gorm:"foreignKey:Tag;references:ClanTag;onUpdate:CASCADE;onDelete:CASCADE"`
-	KickpointReasons []*KickpointReason `gorm:"foreignKey:ClanTag;references:ClanTag"`
-	UpdatedByUser    *User              `gorm:"foreignKey:DiscordID;references:UpdatedByDiscordID"`
+	Clan             *Clan              `gorm:"foreignKey:ClanTag;references:Tag;constraint:OnUpdate:CASCADE;OnDelete:CASCADE"`
+	KickpointReasons []*KickpointReason `gorm:"foreignKey:ClanTag;references:ClanTag;constraint:false"`
+	UpdatedByUser    *User              `gorm:"foreignKey:UpdatedByDiscordID;references:DiscordID"`
 }

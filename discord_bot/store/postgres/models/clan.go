@@ -9,8 +9,8 @@ type Clan struct {
 	Name  string
 	Index int
 
-	Settings    *ClanSettings `gorm:"foreignKey:ClanTag;references:Tag"`
-	ClanMembers ClanMembers   `gorm:"foreignKey:ClanTag;references:Tag"`
+	Settings    *ClanSettings `gorm:"foreignKey:ClanTag;references:Tag;constraint:OnDelete:CASCADE"`
+	ClanMembers ClanMembers   `gorm:"foreignKey:ClanTag;references:Tag;constraint:false"`
 }
 
 type Clans []Clan

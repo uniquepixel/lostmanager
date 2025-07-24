@@ -5,5 +5,6 @@ type MemberState struct {
 	ClanTag       string `gorm:"primaryKey"`
 	KickpointLock bool   `gorm:"default:false;not null"`
 
-	Member *ClanMember `gorm:"foreignKey:PlayerTag,ClanTag"`
+	// Remove the association to prevent GORM from creating reverse foreign keys
+	// Relationships will be handled manually in queries when needed
 }
