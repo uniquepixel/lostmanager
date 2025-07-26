@@ -55,7 +55,7 @@ func main() {
 				SELECT player_tag, clan_tag 
 				FROM clan_members 
 				WHERE player_tag = ? 
-				ORDER BY clan_tag 
+				ORDER BY index DESC
 				LIMIT 1
 			)
 		`, duplicate.PlayerTag, duplicate.PlayerTag).Error; err != nil {
