@@ -25,6 +25,7 @@ type IMemberHandler interface {
 	AddMember(s *discordgo.Session, i *discordgo.InteractionCreate)
 	RemoveMember(s *discordgo.Session, i *discordgo.InteractionCreate)
 	EditMember(s *discordgo.Session, i *discordgo.InteractionCreate)
+	TransferMember(s *discordgo.Session, i *discordgo.InteractionCreate)
 	HandleAutocomplete(s *discordgo.Session, i *discordgo.InteractionCreate)
 }
 
@@ -288,6 +289,77 @@ func (h *MemberHandler) EditMember(_ *discordgo.Session, i *discordgo.Interactio
 	))
 }
 
+func (h *MemberHandler) TransferMember(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	opts := i.ApplicationCommandData().Options
+	playerTag := util.StringOptionByName(PlayerTagOptionName, opts)
+	fromClanTag := util.StringOptionByName("from_clan", opts)
+	toClanTag := util.StringOptionByName("to_clan", opts)
+	role := models.ClanRole(util.StringOptionByName(RoleOptionName, opts))
+
+	if playerTag == "" || fromClanTag == "" || toClanTag == "" || role == "" {
+		messages.SendInvalidInputErr(i, "Bitte gib alle erforderlichen Felder an.")
+		return
+	}
+
+	if !validation.ValidateClanRole(role) {
+		messages.SendInvalidInputErr(i, fmt.Sprintf("Die Rolle %s ist ungültig.", string(role)))
+		return
+	}
+
+	// Check authorization for both clans (admin required for transfers)
+	if err := h.auth.AuthorizeInteraction(i, fromClanTag, types.AuthRoleAdmin); err != nil {
+		return
+	}
+	if err := h.auth.AuthorizeInteraction(i, toClanTag, types.AuthRoleAdmin); err != nil {
+		return
+	}
+
+	// Verify the player exists in the source clan
+	currentMember, err := h.members.MemberByID(playerTag, fromClanTag)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			messages.SendMemberNotFound(i, playerTag, fromClanTag)
+		} else {
+			messages.SendUnknownErr(i)
+		}
+		return
+	}
+
+	// Perform the transfer
+	if err = h.members.TransferMember(playerTag, fromClanTag, toClanTag, role, i.Member.User.ID); err != nil {
+		messages.SendEmbedResponse(i, messages.NewEmbed(
+			"Transfer fehlgeschlagen",
+			"Beim Übertragen des Mitglieds ist ein Fehler aufgetreten.",
+			messages.ColorRed,
+		))
+		return
+	}
+
+	// Update Discord roles if possible
+	player, err := h.players.PlayerByTag(playerTag)
+	if err == nil && player.DiscordID != "" {
+		// Remove old clan role
+		if fromGuild, err := h.guilds.GuildByClanTag(i.GuildID, fromClanTag); err == nil {
+			s.GuildMemberRoleRemove(i.GuildID, player.DiscordID, fromGuild.MemberRoleID)
+		}
+
+		// Add new clan role
+		if toGuild, err := h.guilds.GuildByClanTag(i.GuildID, toClanTag); err == nil {
+			s.GuildMemberRoleAdd(i.GuildID, player.DiscordID, toGuild.MemberRoleID)
+		}
+	}
+
+	fromClanName, _ := h.clans.ClanNameByTag(fromClanTag)
+	toClanName, _ := h.clans.ClanNameByTag(toClanTag)
+
+	messages.SendEmbedResponse(i, messages.NewEmbed(
+		"Mitglied übertragen",
+		fmt.Sprintf("Das Mitglied %s wurde erfolgreich von %s zu %s übertragen und hat nun die Rolle %s.",
+			currentMember.Player.Name, fromClanName, toClanName, role.Format()),
+		messages.ColorGreen,
+	))
+}
+
 func (h *MemberHandler) HandleAutocomplete(_ *discordgo.Session, i *discordgo.InteractionCreate) {
 	opts := i.ApplicationCommandData().Options
 
@@ -303,6 +375,8 @@ func (h *MemberHandler) HandleAutocomplete(_ *discordgo.Session, i *discordgo.In
 			autocompleteMembers(i, h.players, opt.StringValue(), util.StringOptionByName(ClanTagOptionName, opts))
 		case PlayerTagOptionName:
 			autocompletePlayers(i, h.players, opt.StringValue())
+		case "from_clan", "to_clan":
+			autocompleteClans(i, h.clans, opt.StringValue())
 		}
 	}
 }

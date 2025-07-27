@@ -12,7 +12,7 @@ require (
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	golang.org/x/text v0.20.0
 	gorm.io/driver/postgres v1.5.10
-	gorm.io/gorm v1.25.12
+	gorm.io/gorm v1.30.0
 )
 
 require (
