@@ -13,16 +13,20 @@ import (
 )
 
 func SendClanKickpoints(i *discordgo.InteractionCreate, clanName string, members []*types.ClanMemberKickpoints) {
-	desc := "" // send in description because of embed field limit
-	for _, m := range members {
-		desc += fmt.Sprintf("%s (%s): %d Kickpunkte\n\n", m.Name, m.Tag, m.Amount)
-	}
+    desc := "" // send in description because of embed field limit
+    for _, m := range members {
+        kickpointText := "Kickpunkte"
+        if m.Amount == 1 {
+            kickpointText = "Kickpunkt"
+        }
+        desc += fmt.Sprintf("%s (%s): %d %s\n\n", m.Name, m.Tag, m.Amount, kickpointText)
+    }
 
-	SendEmbedResponse(i, NewEmbed(
-		fmt.Sprintf("Kickpunkte von %s", clanName),
-		desc,
-		ColorAqua,
-	))
+    SendEmbedResponse(i, NewEmbed(
+        fmt.Sprintf("Kickpunkte von %s", clanName),
+        desc,
+        ColorAqua,
+    ))
 }
 
 func SendMemberKickpoints(i *discordgo.InteractionCreate, kickpoints []*models.Kickpoint, kickpointSum int, maxKickpoints string, clanName string) {

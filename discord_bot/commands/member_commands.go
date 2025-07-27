@@ -120,5 +120,45 @@ func memberInteractionCommands(db *gorm.DB, clashClient *goclash.Client) types.C
 				optionMemberTag("Mitglied, das vom Clan entfernt werden soll."),
 			},
 		},
+	}, {
+		Handler: types.InteractionHandler{
+			Main:         handler.TransferMember,
+			Autocomplete: handler.HandleAutocomplete,
+		},
+		ApplicationCommand: &discordgo.ApplicationCommand{
+			Name:         "transfermember",
+			Description:  "Überträgt ein Mitglied von einem Clan zu einem anderen.",
+			Type:         discordgo.ChatApplicationCommand,
+			DMPermission: util.BoolPtr(false),
+			Options: []*discordgo.ApplicationCommandOption{
+				optionPlayerTag("Spieler, der übertragen werden soll."),
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "from_clan",
+					Description: "Clan, aus dem das Mitglied übertragen werden soll.",
+					Required:    true,
+					Autocomplete: true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "to_clan",
+					Description: "Clan, in den das Mitglied übertragen werden soll.",
+					Required:    true,
+					Autocomplete: true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "role",
+					Description: "Rolle, die das Mitglied im neuen Clan haben soll.",
+					Required:    true,
+					Choices: []*discordgo.ApplicationCommandOptionChoice{
+						{Name: models.RoleLeader.Format(), Value: models.RoleLeader.String()},
+						{Name: models.RoleCoLeader.Format(), Value: models.RoleCoLeader.String()},
+						{Name: models.RoleElder.Format(), Value: models.RoleElder.String()},
+						{Name: models.RoleMember.Format(), Value: models.RoleMember.String()},
+					},
+				},
+			},
+		},
 	}}
 }

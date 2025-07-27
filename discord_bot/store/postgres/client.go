@@ -24,14 +24,97 @@ func NewClient() (*gorm.DB, error) {
 		return nil, err
 	}
 
-	if err = seedDB(db); err != nil {
+	if err = migrateAndSeedDB(db); err != nil {
 		return nil, err
 	}
 
 	return db, nil
 }
 
-func seedDB(db *gorm.DB) error {
+func migrateAndSeedDB(db *gorm.DB) error {
+	// First, migrate all tables without foreign key constraints
+	if err := db.Set("gorm:table_options", "ENGINE=InnoDB").AutoMigrate(
+		// Independent models first
+		&models.User{},
+		&models.Player{},
+		&models.Clan{},
+		&models.Guild{},
+		
+		// Models that depend on the above
+		&models.ClanMember{},
+		&models.ClanSettings{},
+		&models.KickpointReason{},
+		
+		// Models that depend on ClanMember
+		&models.MemberState{},
+		&models.Kickpoint{},
+		
+		// Event-related models
+		&models.ClanEvent{},
+		&models.ClanEventMember{},
+	); err != nil {
+		return err
+	}
+
+	// Clean up orphaned data
+	if err := cleanupOrphanedData(db); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func cleanupOrphanedData(db *gorm.DB) error {
+	// Clean up orphaned data before applying foreign key constraints
+	
+	// Remove clan_settings records that don't have corresponding clans
+	if err := db.Exec(`
+		DELETE FROM clan_settings 
+		WHERE clan_tag NOT IN (SELECT tag FROM clans)
+	`).Error; err != nil {
+		log.Printf("Warning: Could not clean orphaned clan_settings: %v", err)
+	}
+	
+	// Clean up duplicate clan members - keep only the most recent one for each player
+	// if err := db.Exec(`
+	// 	DELETE FROM clan_members 
+	// 	WHERE (player_tag, clan_tag) NOT IN (
+	// 		SELECT DISTINCT ON (player_tag) player_tag, clan_tag 
+	// 		FROM clan_members 
+	// 		ORDER BY player_tag, clan_tag
+	// 	)
+	// `).Error; err != nil {
+	// 	log.Printf("Warning: Could not clean up duplicate clan members: %v", err)
+	// }
+	
+	// Remove clan_members records that don't have corresponding clans or players
+	if err := db.Exec(`
+		DELETE FROM clan_members 
+		WHERE clan_tag NOT IN (SELECT tag FROM clans) 
+		   OR player_tag NOT IN (SELECT coc_tag FROM players)
+	`).Error; err != nil {
+		log.Printf("Warning: Could not clean orphaned clan_members: %v", err)
+	}
+	
+	// Remove kickpoints records that don't have corresponding clans or players
+	if err := db.Exec(`
+		DELETE FROM kickpoints 
+		WHERE clan_tag NOT IN (SELECT tag FROM clans) 
+		   OR player_tag NOT IN (SELECT coc_tag FROM players)
+	`).Error; err != nil {
+		log.Printf("Warning: Could not clean orphaned kickpoints: %v", err)
+	}
+	
+	// Remove member_states records that don't have corresponding clan_members
+	if err := db.Exec(`
+		DELETE FROM member_states 
+		WHERE (player_tag, clan_tag) NOT IN (
+			SELECT player_tag, clan_tag FROM clan_members
+		)
+	`).Error; err != nil {
+		log.Printf("Warning: Could not clean orphaned member_states: %v", err)
+	}
+	
 	return nil
 }
 
@@ -45,26 +128,15 @@ func newGormClient() (client *gorm.DB, err error) {
 	for i := 0; i < maxRetries; i++ {
 		if client, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
 			Logger: logger.Default.LogMode(loggerMode),
+			DisableForeignKeyConstraintWhenMigrating: true, // Disable FK constraints during migration
 		}); err != nil {
 			log.Printf("Failed to connect to database: %v\nRetrying in %s...", err, retryTimeout.String())
 			time.Sleep(retryTimeout)
 			continue
 		}
 
-		if err := client.AutoMigrate(
-			// &models.ClanEventMember{},
-			// &models.ClanEvent{},
-			// &models.ClanMember{},
-			// &models.ClanSettings{},
-			// &models.Clan{},
-			// &models.Guild{},
-			// &models.KickpointReason{},
-			&models.Kickpoint{},
-			// &models.MemberState{},
-			// &models.Player{},
-			// &models.User{},
-			// &AnotherModel{},
-		); err != nil {
+		// Migrate database schema and clean up data
+		if err := migrateAndSeedDB(client); err != nil {
 			panic(err)
 		}
 

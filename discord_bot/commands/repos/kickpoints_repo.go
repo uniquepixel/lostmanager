@@ -40,7 +40,7 @@ func (repo *KickpointsRepo) ActiveClanKickpoints(settings *models.ClanSettings) 
 
 	var memberKickpoints []*types.ClanMemberKickpoints
 	if err := repo.db.
-		Raw("SELECT p.name AS name, p.coc_tag as tag, SUM(k.amount) AS amount FROM kickpoints k INNER JOIN players p ON k.player_tag = p.coc_tag WHERE k.clan_tag = ? AND k.date BETWEEN ? AND NOW() GROUP BY p.name, p.coc_tag ORDER BY amount DESC", settings.ClanTag, minDate).
+		Raw("SELECT p.name AS name, p.coc_tag as tag, SUM(k.amount) AS amount FROM kickpoints k INNER JOIN players p ON k.player_tag = p.coc_tag INNER JOIN clan_members m ON p.coc_tag = m.player_tag WHERE m.clan_tag = ? AND k.date BETWEEN ? AND NOW() GROUP BY p.name, p.coc_tag ORDER BY amount DESC", settings.ClanTag, minDate).
 		Scan(&memberKickpoints).Error; err != nil {
 		return nil, err
 	}
