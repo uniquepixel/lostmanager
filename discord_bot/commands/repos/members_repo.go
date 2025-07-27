@@ -81,6 +81,7 @@ func (repo *MembersRepo) GetPlayerCurrentClan(playerTag string) (*models.ClanMem
 	var member *models.ClanMember
 	err := repo.db.
 		Preload(clause.Associations).
+		Order("joined_at DESC"). // Ensure the most recent clan is selected
 		First(&member, "player_tag = ?", playerTag).Error
 	return member, err
 }
