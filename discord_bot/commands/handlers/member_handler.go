@@ -306,11 +306,18 @@ func (h *MemberHandler) TransferMember(s *discordgo.Session, i *discordgo.Intera
 		return
 	}
 
+	requiredAuthRole := types.AuthRoleAdmin
+	if role == models.RoleMember || role == models.RoleElder {
+		requiredAuthRole = types.AuthRoleCoLeader
+	} else if role == models.RoleCoLeader {
+		requiredAuthRole = types.AuthRoleLeader
+	}
+
 	// Check authorization for both clans (admin required for transfers)
-	if err := h.auth.AuthorizeInteraction(i, fromClanTag, types.AuthRoleAdmin); err != nil {
+	if err := h.auth.AuthorizeInteraction(i, fromClanTag, requiredAuthRole); err != nil {
 		return
 	}
-	if err := h.auth.AuthorizeInteraction(i, toClanTag, types.AuthRoleAdmin); err != nil {
+	if err := h.auth.AuthorizeInteraction(i, toClanTag, requiredAuthRole); err != nil {
 		return
 	}
 
