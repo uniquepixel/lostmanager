@@ -114,6 +114,8 @@ func CWDonatorPing(members []*models.ClanMember, clanWarMembers []goclash.ClanWa
 		})
 	}
 
+	// fmt.Println("Possible donators count:", len(possibleDonators))
+
 	if len(possibleDonators) == 0 {
 		return "Es sind keine Mitglieder im Krieg."
 	}
@@ -128,23 +130,30 @@ func CWDonatorPing(members []*models.ClanMember, clanWarMembers []goclash.ClanWa
 
 	uniqueRand := util.NewUniqueRand()
 	for index := range donators {
-		donationRange := ranges[(index+1)%len(ranges)]
-
-		randomIndexEnd := donationRange.end - 1
-		if randomIndexEnd > len(possibleDonators)-1 {
-			randomIndexEnd = len(possibleDonators) - 1
+		donationRange := ranges[index]
+		
+		// Find eligible donators (those NOT in the current donation range)
+		var eligibleDonators []cwMember
+		for _, donator := range possibleDonators {
+			// Skip if this player is in the range they would be donating to (can't donate to yourself)
+			if donator.warPos >= donationRange.start && donator.warPos <= donationRange.end {
+				continue
+			}
+			eligibleDonators = append(eligibleDonators, donator)
 		}
-
-		// Muss zur Sicherheit gemacht werden, falls extrem viele auf Rot gestellt sind...
-		randomIndexStart := donationRange.start - 1
-		if randomIndexStart > randomIndexEnd {
-			randomIndexStart = randomIndexEnd
+		
+		// If no eligible donators, fall back to allowing self-donation as last resort
+		if len(eligibleDonators) == 0 {
+			eligibleDonators = possibleDonators
 		}
-
-		randomDonator := possibleDonators[uniqueRand.Intn(randomIndexStart, randomIndexEnd)]
+		
+		// Select random donator from eligible ones
+		randomIndex := uniqueRand.Intn(0, len(eligibleDonators)-1)
+		selectedDonator := eligibleDonators[randomIndex]
+		
 		donators[index] = cwDonator{
-			cwMember:      randomDonator,
-			donationRange: ranges[index],
+			cwMember:      selectedDonator,
+			donationRange: donationRange,
 		}
 	}
 
